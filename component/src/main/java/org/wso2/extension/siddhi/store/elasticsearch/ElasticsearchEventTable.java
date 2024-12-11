@@ -519,8 +519,7 @@ public class ElasticsearchEventTable extends AbstractRecordTable {
                     storeAnnotation.getElement(ANNOTATION_ELEMENT_INDEX_REQUEST_TIMEOUT))) {
                 indexRequestTimeout =
                         Long.parseLong(storeAnnotation.getElement(ANNOTATION_ELEMENT_INDEX_REQUEST_TIMEOUT));
-            } else if (!ElasticsearchTableUtils.isEmpty(
-                    configReader.readConfig(ANNOTATION_ELEMENT_INDEX_REQUEST_TIMEOUT, null))) {
+            } else {
                 indexRequestTimeout =
                         Long.parseLong(configReader.readConfig(ANNOTATION_ELEMENT_INDEX_REQUEST_TIMEOUT,
                                 String.valueOf(indexRequestTimeout)));
