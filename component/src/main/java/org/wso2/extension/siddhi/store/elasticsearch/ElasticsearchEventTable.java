@@ -1,20 +1,21 @@
 /*
- * Copyright (c) 2018, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2024, WSO2 LLC. (http://www.wso2.com).
  *
- * WSO2 Inc. licenses this file to you under the Apache License,
+ * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the
+ * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.wso2.extension.siddhi.store.elasticsearch;
 
 import org.apache.http.HttpHost;
@@ -91,6 +92,8 @@ import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchT
 import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.
         ANNOTATION_ELEMENT_BULK_ACTIONS;
 import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.
+        ANNOTATION_ELEMENT_BULK_REQUEST_TIMEOUT;
+import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.
         ANNOTATION_ELEMENT_BULK_SIZE;
 import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.
         ANNOTATION_ELEMENT_CLIENT_IO_THREAD_COUNT;
@@ -108,6 +111,10 @@ import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchT
         ANNOTATION_ELEMENT_INDEX_NUMBER_OF_REPLICAS;
 import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.
         ANNOTATION_ELEMENT_INDEX_NUMBER_OF_SHARDS;
+import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.
+        ANNOTATION_ELEMENT_INDEX_REQUEST_MASTER_TIMEOUT;
+import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.
+        ANNOTATION_ELEMENT_INDEX_REQUEST_TIMEOUT;
 import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.
         ANNOTATION_ELEMENT_MEMBER_LIST;
 import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.
@@ -133,11 +140,14 @@ import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchT
 import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.
         DEFAULT_BACKOFF_POLICY_WAIT_TIME;
 import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.DEFAULT_BULK_ACTIONS;
+import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.DEFAULT_BULK_REQUEST_TIMEOUT;
 import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.DEFAULT_BULK_SIZE_IN_MB;
 import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.
         DEFAULT_CONCURRENT_REQUESTS;
 import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.DEFAULT_FLUSH_INTERVAL;
 import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.DEFAULT_HOSTNAME;
+import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.DEFAULT_INDEX_REQUEST_MASTER_TIMEOUT;
+import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.DEFAULT_INDEX_REQUEST_TIMEOUT;
 import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.DEFAULT_IO_THREAD_COUNT;
 import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchTableConstants.
         DEFAULT_NUMBER_OF_REPLICAS;
@@ -250,7 +260,20 @@ import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchT
                 @Parameter(name = "trust.store.pass",
                         description = "Trust store password.",
                         type = {DataType.STRING}, optional = true,
-                        defaultValue = "wso2carbon")
+                        defaultValue = "wso2carbon"),
+                @Parameter(name = "index.request.timeout",
+                        description = "Timeout to wait for the all the nodes to " +
+                                "acknowledge the index-related operations in seconds.",
+                        type = {DataType.LONG}, optional = true,
+                        defaultValue = "30"),
+                @Parameter(name = "index.request.master.timeout",
+                        description = "Timeout to connect to the master node for index-related operations in seconds.",
+                        type = {DataType.LONG}, optional = true,
+                        defaultValue = "30"),
+                @Parameter(name = "bulk.request.timeout",
+                        description = "Timeout to wait for the bulk request to be performed in seconds.",
+                        type = {DataType.LONG}, optional = true,
+                        defaultValue = "60")
         },
 
         examples = {
@@ -328,6 +351,9 @@ public class ElasticsearchEventTable extends AbstractRecordTable {
     private int payloadIndexOfIndexName = DEFAULT_PAYLOAD_INDEX_OF_INDEX_NAME;
     private String listOfHostnames;
     private Map<String, String> typeMappings = new HashMap<>();
+    private long indexRequestTimeout = DEFAULT_INDEX_REQUEST_TIMEOUT;
+    private long indexRequestMasterTimeout = DEFAULT_INDEX_REQUEST_MASTER_TIMEOUT;
+    private long bulkRequestTimeout = DEFAULT_BULK_REQUEST_TIMEOUT;
 
     /**
      * Initializing the Record Table
@@ -489,6 +515,34 @@ public class ElasticsearchEventTable extends AbstractRecordTable {
                     typeMappings.put(element.getKey(), element.getValue());
                 }
             }
+
+            if (!ElasticsearchTableUtils.isEmpty(
+                    storeAnnotation.getElement(ANNOTATION_ELEMENT_INDEX_REQUEST_TIMEOUT))) {
+                indexRequestTimeout =
+                        Long.parseLong(storeAnnotation.getElement(ANNOTATION_ELEMENT_INDEX_REQUEST_TIMEOUT));
+            } else {
+                indexRequestTimeout =
+                        Long.parseLong(configReader.readConfig(ANNOTATION_ELEMENT_INDEX_REQUEST_TIMEOUT,
+                                String.valueOf(indexRequestTimeout)));
+            }
+            if (!ElasticsearchTableUtils.isEmpty(
+                    storeAnnotation.getElement(ANNOTATION_ELEMENT_INDEX_REQUEST_MASTER_TIMEOUT))) {
+                indexRequestMasterTimeout =
+                        Long.parseLong(storeAnnotation.getElement(ANNOTATION_ELEMENT_INDEX_REQUEST_MASTER_TIMEOUT));
+            } else {
+                indexRequestMasterTimeout =
+                        Long.parseLong(configReader.readConfig(ANNOTATION_ELEMENT_INDEX_REQUEST_MASTER_TIMEOUT,
+                                String.valueOf(indexRequestMasterTimeout)));
+            }
+            if (!ElasticsearchTableUtils.isEmpty(
+                    storeAnnotation.getElement(ANNOTATION_ELEMENT_BULK_REQUEST_TIMEOUT))) {
+                bulkRequestTimeout =
+                        Long.parseLong(storeAnnotation.getElement(ANNOTATION_ELEMENT_BULK_REQUEST_TIMEOUT));
+            } else {
+                bulkRequestTimeout =
+                        Long.parseLong(configReader.readConfig(ANNOTATION_ELEMENT_BULK_REQUEST_TIMEOUT,
+                                String.valueOf(bulkRequestTimeout)));
+            }
         } else {
             throw new ElasticsearchEventTableException("Elasticsearch Store annotation list null for table id : '" +
                     tableDefinition.getId() + "', required properties cannot be resolved.");
@@ -557,7 +611,7 @@ public class ElasticsearchEventTable extends AbstractRecordTable {
         BulkProcessor.Builder bulkProcessorBuilder = BulkProcessor.builder(
                 (request, bulkListener) ->
                         restHighLevelClient.bulkAsync(request, RequestOptions.DEFAULT, bulkListener),
-                new BulkProcessorListener());
+                new BulkProcessorListener(bulkRequestTimeout));
         bulkProcessorBuilder.setBulkActions(bulkActions);
         bulkProcessorBuilder.setBulkSize(new ByteSizeValue(bulkSize, ByteSizeUnit.MB));
         bulkProcessorBuilder.setConcurrentRequests(concurrentRequests);
@@ -571,9 +625,16 @@ public class ElasticsearchEventTable extends AbstractRecordTable {
     }
 
     static class BulkProcessorListener implements BulkProcessor.Listener {
+        private final long bulkRequestTimeout;
+
+        private BulkProcessorListener(long bulkRequestTimeout) {
+            this.bulkRequestTimeout = bulkRequestTimeout;
+        }
+
         @Override
         public void beforeBulk(long executionId, BulkRequest request) {
             int numberOfActions = request.numberOfActions();
+            request.timeout(TimeValue.timeValueSeconds(bulkRequestTimeout));
             logger.debug("Executing bulk [{" + executionId + "}] with {" + numberOfActions + "} requests");
         }
 
@@ -851,6 +912,8 @@ public class ElasticsearchEventTable extends AbstractRecordTable {
         }
 
         CreateIndexRequest request = new CreateIndexRequest(indexName);
+        request.setTimeout(TimeValue.timeValueSeconds(indexRequestTimeout));
+        request.setMasterTimeout(TimeValue.timeValueSeconds(indexRequestMasterTimeout));
         request.settings(Settings.builder()
                 .put(SETTING_INDEX_NUMBER_OF_SHARDS, numberOfShards)
                 .put(SETTING_INDEX_NUMBER_OF_REPLICAS, numberOfReplicas)
