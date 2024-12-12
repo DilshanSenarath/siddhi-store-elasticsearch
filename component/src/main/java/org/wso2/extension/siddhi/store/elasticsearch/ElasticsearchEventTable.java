@@ -265,15 +265,15 @@ import static org.wso2.extension.siddhi.store.elasticsearch.utils.ElasticsearchT
                         description = "Timeout to wait for the all the nodes to " +
                                 "acknowledge the index-related operations in seconds.",
                         type = {DataType.LONG}, optional = true,
-                        defaultValue = "null"),
+                        defaultValue = "30"),
                 @Parameter(name = "index.request.master.timeout",
                         description = "Timeout to connect to the master node for index-related operations in seconds.",
                         type = {DataType.LONG}, optional = true,
-                        defaultValue = "null"),
+                        defaultValue = "30"),
                 @Parameter(name = "bulk.request.timeout",
                         description = "Timeout to wait for the bulk request to be performed in seconds.",
                         type = {DataType.LONG}, optional = true,
-                        defaultValue = "null")
+                        defaultValue = "60")
         },
 
         examples = {
