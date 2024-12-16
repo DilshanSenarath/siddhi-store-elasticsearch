@@ -17,7 +17,7 @@
   ~ under the License.
   -->
 
-<FindBugsFilter>>
+<FindBugsFilter>
     <Match>
         <Package name="org.wso2.extension.siddhi.store.elasticsearch"/>
         <Bug pattern="IMPROPER_UNICODE, CRLF_INJECTION_LOGS, PATH_TRAVERSAL_IN" />
